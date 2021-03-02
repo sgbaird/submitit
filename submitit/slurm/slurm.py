@@ -409,6 +409,7 @@ def _make_sbatch_string(
     array_parallelism: int = 256,
     wckey: str = "submitit",
     map_count: tp.Optional[int] = None,  # used internally
+    stderr_to_stdout: bool = False,
     additional_parameters: tp.Optional[tp.Dict[str, tp.Any]] = None,
 ) -> str:
     """Creates the content of an sbatch file with provided parameters
@@ -474,7 +475,8 @@ def _make_sbatch_string(
         stdout = stdout.replace("%j", "%A_%a")
         stderr = stderr.replace("%j", "%A_%a")
     parameters["output"] = stdout.replace("%t", "0")
-    parameters["error"] = stderr.replace("%t", "0")
+    if not stderr_to_stdout:
+        parameters["error"] = stderr.replace("%t", "0")
     parameters.update({"signal": f"USR1@{signal_delay_s}", "open-mode": "append"})
     if additional_parameters is not None:
         parameters.update(additional_parameters)
@@ -489,10 +491,11 @@ def _make_sbatch_string(
         lines += ["", "# setup"] + setup
     # commandline (this will run the function and args specified in the file provided as argument)
     # We pass --output and --error here, because the SBATCH command doesn't work as expected with a filename pattern
+    stderr_flag = "" if stderr_to_stdout else f"--error {stderr}"
     lines += [
         "",
         "# command",
         "export SUBMITIT_EXECUTOR=slurm",
-        f"srun --output {stdout} --error {stderr} --unbuffered {command}",
+        f"srun --output {stdout} {stderr_flag} --unbuffered {command}",
     ]
     return "\n".join(lines)
